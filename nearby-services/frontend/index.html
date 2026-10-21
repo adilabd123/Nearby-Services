@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby — Civic Service Finder</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.85);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --accent-gold: #f59e0b;
+            --accent-gold-hover: #d97706;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-bg: rgba(51, 65, 85, 0.5);
+            --card-hover: rgba(51, 65, 85, 0.9);
+            --error-bg: rgba(239, 68, 68, 0.2);
+            --error-border: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            height: 56px;
+            background: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+        }
+
+        .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-gold);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-gold);
+        }
+
+        .status-badge {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .app-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 360px 1fr 380px;
+            height: calc(100vh - 56px);
+            position: relative;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            gap: 20px;
+            z-index: 500;
+        }
+
+        .panel-right {
+            border-right: none;
+            border-left: 1px solid var(--panel-border);
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-gold);
+            color: #000;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-gold-hover);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus, select:focus {
+            border-color: var(--accent-gold);
+        }
+
+        .latlng-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            background: rgba(51, 65, 85, 0.4);
+            border: 1px solid var(--panel-border);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chip:hover, .chip.active {
+            background: var(--accent-gold);
+            color: #000;
+            font-weight: 600;
+            border-color: var(--accent-gold);
+        }
+
+        .toggle-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent-gold);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent-gold);
+            width: 100%;
+        }
+
+        .error-box {
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #1e293b;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .service-card {
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .service-card:hover, .service-card.active {
+            background: var(--card-hover);
+            border-color: var(--accent-gold);
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .card-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .distance-badge {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-gold);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 20px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-dot"></div>
+            <span>Nearby</span>
+        </div>
+        <div class="status-badge" id="statusBadge">Connecting to PostGIS...</div>
+    </header>
+
+    <div class="app-container">
+        
+        <div class="panel">
+            <div class="error-box" id="errorBox"></div>
+
+            <div>
+                <div class="section-title">1 · Set Location</div>
+                <button class="btn-primary" id="btnGeolocate" style="margin-bottom: 10px;">
+                    🎯 Use my current location
+                </button>
+                <div class="input-group" style="margin-bottom: 10px;">
+                    <input type="text" id="searchAddress" placeholder="Search city or address...">
+                    <button class="btn-primary" id="btnSearchAddress" style="width: auto;">Go</button>
+                </div>
+                <div class="latlng-grid">
+                    <div>
+                        <span class="section-title">Latitude</span>
+                        <input type="text" id="inputLat" value="18.5204" readonly>
+                    </div>
+                    <div>
+                        <span class="section-title">Longitude</span>
+                        <input type="text" id="inputLng" value="73.8567" readonly>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                    Or click anywhere on the map to drop a pin.
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">2 · Category</div>
+                <div class="chips-container" id="categoryChips">
+                    <div class="chip active" data-cat="all">All Services</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <select id="selectSubcategory">
+                        <option value="">All Subcategories</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">3 · Search Method</div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" id="btnModeRadius">Radius</button>
+                    <button class="toggle-btn" id="btnModeNearest">Nearest-N</button>
+                </div>
+
+                <div class="slider-container" id="radiusControl">
+                    <div class="slider-header">
+                        <span>Search Radius</span>
+                        <span id="radiusVal" style="color: var(--accent-gold); font-weight: 600;">5.0 km</span>
+                    </div>
+                    <input type="range" id="sliderRadius" min="200" max="20000" step="200" value="5000">
+                </div>
+
+                <div class="slider-container" id="nearestControl" style="display: none;">
+                    <div class="slider-header">
+                        <span>Nearest Results</span>
+                        <span id="nearestVal" style="color: var(--accent-gold); font-weight: 600;">10 items</span>
+                    </div>
+                    <input type="range" id="sliderNearest" min="1" max="50" step="1" value="10">
+                </div>
+            </div>
+
+            <button class="btn-primary" id="btnFindServices" style="margin-top: auto;">
+                🔍 Find nearby services
+            </button>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="panel panel-right">
+            <div class="results-header">
+                <div class="section-title" style="margin-bottom:0;">Results (<span id="resultCount">0</span>)</div>
+            </div>
+
+            <div class="card-list" id="cardList">
+                <div class="empty-state">
+                    Set a location and click <strong>Find nearby services</strong> to display distance-sorted results.
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        const API_BASE = "http://localhost:8000";
+
+        let state = {
+            lat: 18.5204,
+            lng: 73.8567,
+            category: "all",
+            subcategory: "",
+            mode: "radius",
+            radius_m: 5000,
+            n: 10,
+            categoriesData: {}
+        };
+
+        const errorBox = document.getElementById('errorBox');
+        const statusBadge = document.getElementById('statusBadge');
+        const inputLat = document.getElementById('inputLat');
+        const inputLng = document.getElementById('inputLng');
+        const categoryChips = document.getElementById('categoryChips');
+        const selectSubcategory = document.getElementById('selectSubcategory');
+        const btnModeRadius = document.getElementById('btnModeRadius');
+        const btnModeNearest = document.getElementById('btnModeNearest');
+        const radiusControl = document.getElementById('radiusControl');
+        const nearestControl = document.getElementById('nearestControl');
+        const sliderRadius = document.getElementById('sliderRadius');
+        const radiusVal = document.getElementById('radiusVal');
+        const sliderNearest = document.getElementById('sliderNearest');
+        const nearestVal = document.getElementById('nearestVal');
+        const cardList = document.getElementById('cardList');
+        const resultCount = document.getElementById('resultCount');
+
+        const map = L.map('map', { zoomControl: false }).setView([state.lat, state.lng], 13);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const userMarkerGroup = L.layerGroup().addTo(map);
+        const serviceMarkersGroup = L.layerGroup().addTo(map);
+
+        function updateUserMarker(lat, lng) {
+            userMarkerGroup.clearLayers();
+            state.lat = lat;
+            state.lng = lng;
+            inputLat.value = lat.toFixed(4);
+            inputLng.value = lng.toFixed(4);
+
+            const userIcon = L.divIcon({
+                className: 'user-pin',
+                html: `<div style="background:#f59e0b; width:16px; height:16px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+
+            L.marker([lat, lng], { icon: userIcon }).addTo(userMarkerGroup)
+                .bindPopup("<b>Your Origin Location</b>").openPopup();
+        }
+
+        updateUserMarker(state.lat, state.lng);
+
+        map.on('click', (e) => {
+            updateUserMarker(e.latlng.lat, e.latlng.lng);
+        });
+
+        function showError(msg) {
+            if (msg) {
+                errorBox.innerText = msg;
+                errorBox.style.display = 'block';
+            } else {
+                errorBox.style.display = 'none';
+            }
+        }
+
+        // City Search / Geocoding Functionality
+        async function geocodeAddress(query) {
+            if (!query || !query.trim()) return;
+            statusBadge.innerText = "Searching city location...";
+            
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                if (data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lng = parseFloat(data[0].lon);
+                    updateUserMarker(lat, lng);
+                    map.flyTo([lat, lng], 14);
+                    showError(null);
+                    fetchServices(); // Automatically search nearby facilities for the new city
+                } else {
+                    showError(`Location "${query}" not found. Try entering a different city or area.`);
+                }
+            } catch (err) {
+                showError("Geocoding service unavailable. Please try again.");
+            } finally {
+                statusBadge.innerText = "Connected to PostGIS";
+            }
+        }
+
+        document.getElementById('btnSearchAddress').addEventListener('click', () => {
+            geocodeAddress(document.getElementById('searchAddress').value);
+        });
+
+        document.getElementById('searchAddress').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                geocodeAddress(document.getElementById('searchAddress').value);
+            }
+        });
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/api/categories`);
+                if (!response.ok) throw new Error("Database server returned error.");
+                
+                state.categoriesData = await response.json();
+                statusBadge.innerText = "Connected to PostGIS";
+                statusBadge.style.color = "#10b981";
+                showError(null);
+
+                renderCategoryChips();
+            } catch (err) {
+                statusBadge.innerText = "Backend Disconnected";
+                statusBadge.style.color = "#ef4444";
+                showError(`Could not load categories from API (${API_BASE}). Is the backend server running?`);
+            }
+        }
+
+        function renderCategoryChips() {
+            categoryChips.innerHTML = `<div class="chip ${state.category === 'all' ? 'active' : ''}" data-cat="all">All Services</div>`;
+            
+            for (const [code, cat] of Object.entries(state.categoriesData)) {
+                const chip = document.createElement('div');
+                chip.className = `chip ${state.category === code ? 'active' : ''}`;
+                chip.dataset.cat = code;
+                chip.innerText = cat.label;
+                chip.addEventListener('click', () => selectCategory(code));
+                categoryChips.appendChild(chip);
+            }
+        }
+
+        function selectCategory(code) {
+            state.category = code;
+            state.subcategory = "";
+            renderCategoryChips();
+
+            selectSubcategory.innerHTML = `<option value="">All Subcategories</option>`;
+            if (code !== 'all' && state.categoriesData[code]) {
+                state.categoriesData[code].subcategories.forEach(sub => {
+                    const opt = document.createElement('option');
+                    opt.value = sub.code;
+                    opt.innerText = sub.label;
+                    selectSubcategory.appendChild(opt);
+                });
+            }
+        }
+
+        btnModeRadius.addEventListener('click', () => {
+            state.mode = 'radius';
+            btnModeRadius.classList.add('active');
+            btnModeNearest.classList.remove('active');
+            radiusControl.style.display = 'flex';
+            nearestControl.style.display = 'none';
+        });
+
+        btnModeNearest.addEventListener('click', () => {
+            state.mode = 'nearest';
+            btnModeNearest.classList.add('active');
+            btnModeRadius.classList.remove('active');
+            nearestControl.style.display = 'flex';
+            radiusControl.style.display = 'none';
+        });
+
+        sliderRadius.addEventListener('input', (e) => {
+            state.radius_m = parseInt(e.target.value);
+            radiusVal.innerText = `${(state.radius_m / 1000).toFixed(1)} km`;
+        });
+
+        sliderNearest.addEventListener('input', (e) => {
+            state.n = parseInt(e.target.value);
+            nearestVal.innerText = `${state.n} items`;
+        });
+
+        document.getElementById('btnGeolocate').addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                showError("Geolocation is not supported by your browser.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    updateUserMarker(pos.coords.latitude, pos.coords.longitude);
+                    map.flyTo([pos.coords.latitude, pos.coords.longitude], 14);
+                    showError(null);
+                    fetchServices();
+                },
+                () => {
+                    showError("Geolocation request denied. Click anywhere on the map manually.");
+                }
+            );
+        });
+
+        async function fetchServices() {
+            serviceMarkersGroup.clearLayers();
+            cardList.innerHTML = `<div class="empty-state">Searching nearby PostGIS records...</div>`;
+
+            const params = new URLSearchParams({
+                lat: state.lat,
+                lng: state.lng,
+                category: state.category,
+                subcategory: selectSubcategory.value,
+                mode: state.mode,
+                radius_m: state.radius_m,
+                n: state.n
+            });
+
+            try {
+                const res = await fetch(`${API_BASE}/api/services/nearby?${params.toString()}`);
+                if (!res.ok) throw new Error("Search query failed");
+                const data = await res.json();
+
+                renderResults(data);
+                showError(null);
+            } catch (err) {
+                cardList.innerHTML = `<div class="empty-state">Error fetching services. Check backend connection.</div>`;
+            }
+        }
+
+        function renderResults(services) {
+            resultCount.innerText = services.length;
+
+            if (services.length === 0) {
+                cardList.innerHTML = `<div class="empty-state">No services found in this area for the selected criteria. Try expanding the radius!</div>`;
+                return;
+            }
+
+            cardList.innerHTML = '';
+            const bounds = L.latLngBounds([[state.lat, state.lng]]);
+
+            services.forEach((service) => {
+                const distanceStr = service.distance_m > 1000 
+                    ? `${(service.distance_m / 1000).toFixed(1)} km` 
+                    : `${Math.round(service.distance_m)} m`;
+
+                const marker = L.marker([service.lat, service.lng]).addTo(serviceMarkersGroup);
+                marker.bindPopup(`
+                    <div style="font-family:'Inter',sans-serif;">
+                        <b style="font-size:1rem;">${service.name}</b><br>
+                        <span style="color:#64748b; font-size:0.8rem;">${service.address || 'Address unavailable'}</span><br>
+                        <strong style="color:#d97706; font-size:0.85rem;">${distanceStr} away</strong>
+                    </div>
+                `);
+
+                bounds.extend([service.lat, service.lng]);
+
+                const card = document.createElement('div');
+                card.className = 'service-card';
+                card.innerHTML = `
+                    <div class="distance-badge">${distanceStr}</div>
+                    <div class="card-title">${service.name}</div>
+                    <div class="card-meta">
+                        <span>📍 ${service.address || 'Address unavailable'}</span>
+                        <span>📞 ${service.phone || 'No phone listed'}</span>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.service-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    map.flyTo([service.lat, service.lng], 16);
+                    marker.openPopup();
+                });
+
+                cardList.appendChild(card);
+            });
+
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        document.getElementById('btnFindServices').addEventListener('click', fetchServices);
+
+        loadCategories();
+    </script>
+</body>
+</html>
